@@ -18,6 +18,9 @@ VAR
     DriveSpeedSignedRPM : REAL := 0.0;
     DriveResponseAgeSec : REAL := 10000.0;
 
+    RTU : FB_InnovertRTU;
+    RTU_ComPort : UDINT := 0; // Set actual PLC200 COM port from hardware diagnostics
+    RTU_WriteEnable : BOOL := FALSE; // Must remain FALSE until commissioning
     Temp : FB_Pt100Protection;
     HB : FB_Heartbeat;
     StopCheck : FB_ConfirmedStop;
@@ -39,6 +42,32 @@ VAR
     SignedX10DW : DWORD;
     Ack : BOOL := FALSE; // safety reset must be engineered separately
 END_VAR
+
+// Raw RTU communication: use OwenCommunication library; no Modbus COM Port
+// device can occupy the same physical RS-485.
+RTU(
+    EnablePort:=RTU_ComPort > 0,
+    ComPortNumber:=RTU_ComPort,
+    SlaveId:=1, Baudrate:=38400,
+    EnableWrites:=RTU_WriteEnable,
+    CommandPermitted:=RunPermitted,
+    SetFrequency:=DriveCmd.FrequencyWord,
+    SetControl:=DriveCmd.ControlWord,
+    CycleSec:=CycleSec
+);
+GVL_DriveIO.SpeedRaw := RTU.SpeedRaw;
+GVL_DriveIO.StatusRaw := RTU.StatusRaw;
+GVL_DriveIO.FrequencyRaw := RTU.FrequencyRaw;
+GVL_DriveIO.CurrentRaw := RTU.CurrentRaw;
+GVL_DriveIO.FaultCodeRaw := RTU.FaultRaw;
+GVL_DriveIO.SpeedResponsePulse := RTU.SpeedFresh;
+GVL_DriveIO.StatusResponsePulse := RTU.StatusFresh;
+GVL_DriveIO.DriveReadFresh := RTU.Healthy;
+ 
+// WARNING: The following drive-dependent values must be decoded and proven
+// from the real IMD222U21E-ENC diagnostics. Not hardwired to TRUE.
+// DriveReportsStopped, DriveStatusDecoded, DriveSpeedScalingProven
+// and DriveSpeedSignedRPM are commissioning variables.
 
 // Inputs Holding[0..4] must be protected against concurrent partial writes.
 // The application accepts ONLY a changed command ID and validated fields.
